@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Machine Failure Predictor</title>
+  <style>
+    :root { color-scheme: light; }
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      max-width: 620px;
+      margin: 40px auto;
+      padding: 0 20px;
+      background: #f7f8fa;
+      color: #1a1a1a;
+    }
+    h1 { font-size: 1.4rem; margin-bottom: 4px; }
+    p.sub { color: #666; margin-top: 0; margin-bottom: 24px; font-size: 0.9rem; }
+    form {
+      background: #fff;
+      border: 1px solid #e2e2e2;
+      border-radius: 10px;
+      padding: 24px;
+    }
+    label {
+      display: block;
+      font-weight: 600;
+      font-size: 0.85rem;
+      margin-top: 14px;
+      margin-bottom: 4px;
+    }
+    input, select {
+      width: 100%;
+      padding: 8px 10px;
+      font-size: 0.95rem;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      box-sizing: border-box;
+    }
+    button {
+      margin-top: 20px;
+      width: 100%;
+      padding: 10px;
+      font-size: 1rem;
+      font-weight: 600;
+      color: #fff;
+      background: #2f6fed;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    button:hover { background: #2559c4; }
+    .result {
+      margin-top: 20px;
+      padding: 16px;
+      border-radius: 10px;
+      font-weight: 600;
+      text-align: center;
+    }
+    .result.ok { background: #e6f6ea; color: #1a7a34; border: 1px solid #b6e3c2; }
+    .result.fail { background: #fdecea; color: #b3261e; border: 1px solid #f3b8b4; }
+    .result .prob { display: block; font-weight: 400; margin-top: 6px; font-size: 0.9rem; }
+    .diagnosis {
+      margin-top: 16px;
+      padding: 16px;
+      background: #fff;
+      border: 1px solid #e2e2e2;
+      border-radius: 10px;
+      font-weight: 400;
+      text-align: left;
+    }
+    .diagnosis h3 { margin: 0 0 10px; font-size: 0.9rem; }
+    .diagnosis table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    .diagnosis th, .diagnosis td { text-align: left; padding: 5px 6px; border-bottom: 1px solid #eee; }
+    .diagnosis tr.closest { background: #fff8e1; font-weight: 600; }
+    .diagnosis .note { margin-top: 10px; font-size: 0.8rem; color: #666; font-weight: 400; }
+    nav { margin-bottom: 16px; font-size: 0.85rem; }
+    nav a { color: #2f6fed; text-decoration: none; }
+    nav a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <nav><a href="/">Numeric form</a> &middot; <a href="/ask">Ask a question</a></nav>
+  <h1>Machine Failure Predictor</h1>
+  <p class="sub">Enter sensor readings to check whether the model predicts a failure/defect.</p>
+
+  <form method="post" action="/predict">
+    {% for name, kind, default in fields %}
+      <label for="{{ name }}">{{ name }}</label>
+      {% if kind == "select" %}
+        <select name="{{ name }}" id="{{ name }}">
+          {% for opt in default %}
+            <option value="{{ opt }}" {% if form_values and form_values.get(name) == opt %}selected{% endif %}>{{ opt }}</option>
+          {% endfor %}
+        </select>
+      {% else %}
+        <input type="number" step="any" name="{{ name }}" id="{{ name }}"
+               value="{{ form_values.get(name) if form_values else default }}" required>
+      {% endif %}
+    {% endfor %}
+    <button type="submit">Predict</button>
+  </form>
+
+  {% if result %}
+    <div class="result {{ 'fail' if result.predicted_failure == 1 else 'ok' }}">
+      {{ result.label }}
+      <span class="prob">Failure probability: {{ (result.failure_probability * 100) | round(2) }}%</span>
+    </div>
+
+    <div class="diagnosis">
+      <h3>Specific failure-mode diagnosis</h3>
+      <table>
+        <tr><th>Mode</th><th>Triggered</th><th>Margin</th><th>Detail</th></tr>
+        {% for mode_name, info in result.modes.items() %}
+          <tr class="{{ 'closest' if mode_name == result.closest_mode else '' }}">
+            <td>{{ mode_name }}</td>
+            <td>{{ info.triggered }}</td>
+            <td>{{ (info.relative_margin * 100) | round(1) }}%</td>
+            <td>{{ info.detail }}</td>
+          </tr>
+        {% endfor %}
+      </table>
+      <p class="note">
+        Closest specific mode: <strong>{{ result.closest_mode }}</strong> (smallest margin among
+        TWF/HDF/PWF). OSF is shown for reference only. The overall probability above is the
+        blended-label prediction from the trained model; this table applies the dataset's own
+        deterministic threshold rules to point at which mode it would most likely be.
+      </p>
+    </div>
+  {% endif %}
+</body>
+</html>
